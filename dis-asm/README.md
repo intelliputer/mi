@@ -1,0 +1,1 @@
+The ROM itself can also be disassembled with Atari 2600 tools such as DASM-compatible disassemblers, but that will produce reconstructed assembly rather than the developers’ original source, comments, labels, and macros.
