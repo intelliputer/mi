@@ -1,2 +1,5 @@
-# mi
-The machine-intelligence foundation
+## mi
+
+The machine-intelligence foundation.
+
+
