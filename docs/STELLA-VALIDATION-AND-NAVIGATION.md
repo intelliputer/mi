@@ -31,8 +31,8 @@ Useful targets are:
 make                         # assemble src/adventure.asm
 make run                     # assemble and open the ROM in installed Stella
 make validate                # run Stella and save a short screenshot
-make validate-yellow-key     # run the scripted experimental scenario
-make record-yellow-key       # create a replayable experiment bundle
+make validate-dragon-loss    # run the scripted dragon-loss policy
+make record-dragon-loss      # create a replayable experiment bundle
 make clean                   # remove build/ output
 ```
 
@@ -84,13 +84,13 @@ joystick state transitions as a player would.
 For scenario tests, the Makefile defaults to this local executable:
 
 ```sh
-make validate-yellow-key
+make validate-dragon-loss
 ```
 
 Use an alternate binary explicitly when needed:
 
 ```sh
-make validate-yellow-key SCENARIO_STELLA=/path/to/stella
+make validate-dragon-loss SCENARIO_STELLA=/path/to/stella
 ```
 
 The current custom command-line additions should be reviewed and committed in
@@ -112,25 +112,25 @@ For this ROM, `$9D` is the carried-object byte. Game 1’s yellow key is object
 RAM[$9D] == $BF
 ```
 
-This is the predicate used by the yellow-key experiment. A future scenario can
+This was the predicate used by the attempted yellow-key experiment. A future scenario can
 assert a different documented RAM byte, or Stella can be extended to support a
 small set of assertions in the JSON file.
 
 ### Recorded experiment bundles
 
-`make record-yellow-key` writes `build/experiments/yellow-key/`. It contains
+`make record-dragon-loss` writes `build/experiments/dragon-loss/`. It contains
 the exact copied action trace, a manifest with ROM SHA-256 and run settings,
-per-frame `telemetry.jsonl`, and periodic numbered PNG keyframes. It records
-both passing and failing runs; the exit code is retained in `manifest.json`.
-Snapshots are supporting evidence rather than the source of truth. The action
-trace makes a run replayable, while the telemetry makes it searchable and
-suitable for later trajectory analysis.
+per-frame `telemetry.jsonl`, numbered PNG keyframes every 10 frames, and a
+looping `trajectory.gif`. It records both passing and failing runs; the exit
+code is retained in `manifest.json`. Snapshots are supporting evidence rather
+than the source of truth. The action trace makes a run replayable, while the
+telemetry makes it searchable and suitable for later trajectory analysis.
 
 ## 2. Agent-experimental platform for algorithmic navigation
 
 ### Scenario representation
 
-`validation/yellow-key.json` is a simple action trace. Each entry has:
+`validation/dragon-loss.json` is a simple action trace. Each entry has:
 
 ```json
 { "frame": 37, "event": "LeftJoystickDown", "value": 1 }
@@ -173,12 +173,13 @@ Consequently, a trace intended to play must model two F2/reset cycles, not just
 one. Holding the reset option only at process startup was insufficient because
 this ROM looks for a reset edge relative to its saved switch state.
 
-### Current yellow-key experiment
+### Current dragon-loss experiment
 
 The current JSON is an exploratory, non-passing route. It performs the two
 startup resets and tries a route around the yellow castle’s internal walls.
-`make validate-yellow-key` deliberately requires `$9D=$BF`; it currently
-fails, rather than creating a false success.
+It is named for its observed result: the dragon eats the player.
+`make validate-dragon-loss` deliberately retains `$9D=$BF` as a failing
+yellow-key predicate, rather than creating a false success.
 
 The investigations already established several useful facts:
 
@@ -200,7 +201,7 @@ An Ariadne/Theseus-style experiment can use the following loop:
 1. Build the current assembly source with `make`.
 2. Produce a JSON trace from a fixed policy, a search algorithm, or a learned
    controller.
-3. Run `make validate-yellow-key` (or a new target for another goal).
+3. Run `make validate-dragon-loss` (or a new target for another goal).
 4. Interpret success as a state predicate, and retain diagnostic screenshots
    and failure coordinates for analysis.
 5. Change either the trace/policy or `src/adventure.asm`, then repeat.
@@ -212,8 +213,7 @@ an assertion fails; this is helpful for manually mapping collision geometry.
 
 ### Recommended next increments
 
-- Preserve the current failing yellow-key trace as a regression/diagnostic
-  case, but give it a name describing the observed dragon-loss outcome.
+- Preserve the current dragon-loss trace as a regression/diagnostic case.
 - Add a known-safe navigation trace before defining the yellow-key trace as a
   required build gate.
 - Extend the JSON schema with explicit assertions such as expected room,
