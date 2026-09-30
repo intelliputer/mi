@@ -1,4 +1,4 @@
-# mi — Labyrinth navigation experiments
+# mi — Maze navigation experiments
 
 `mi` is a buildable 4 KiB Atari 2600 ROM written in DASM assembly. It also
 provides a reproducible path from assembly source to Stella emulation, with
