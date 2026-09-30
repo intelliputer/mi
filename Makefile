@@ -9,7 +9,7 @@ VALIDATION_DIR := $(BUILD_DIR)/validation
 EXPERIMENT_DIR := $(BUILD_DIR)/experiments/dragon-loss
 INPUT_SCRIPT := validation/dragon-loss.json
 KEYFRAME_INTERVAL ?= 10
-GIF_DELAY ?= 6
+GIF_DELAY ?= 15
 
 .PHONY: all run validate validate-dragon-loss record-dragon-loss clean
 

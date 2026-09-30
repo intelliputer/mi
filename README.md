@@ -1,113 +1,177 @@
-# mi
+# mi — Labyrinth navigation experiments
 
-`mi` contains a self-contained DASM source file for an Atari 2600 ROM.
+`mi` is a buildable 4 KiB Atari 2600 ROM written in DASM assembly. It also
+provides a reproducible path from assembly source to Stella emulation, with
+scripted controller input, state telemetry, keyframes, and visual experiment
+records.
 
-## Requirements
+The canonical source is [src/adventure.asm](src/adventure.asm). Generated ROMs
+and experiment outputs live under `build/` and are not committed.
 
-Install these command-line programs and ensure they are on your `PATH`:
+## What a fresh clone can do
 
-- [DASM](https://dasm-assembler.github.io/) — the 6502 assembler
-- [Stella](https://stella-emu.github.io/) — optional, for running the ROM
+With DASM, a clone can:
 
-On Debian or Ubuntu:
+- build `src/adventure.asm` into `build/adventure.bin`;
+- open the ROM in a normal installed copy of Stella;
+- run a screenshot-based smoke test; and
+- inspect the preserved dragon-loss trajectory evidence in
+  [validation/dragon-loss-trajectory.gif](validation/dragon-loss-trajectory.gif).
+
+With the companion Stella fork described below, it can additionally replay
+timed controller traces, collect frame-by-frame state telemetry, create
+keyframe GIFs, and make a scenario pass or fail from an emulated RAM predicate.
+
+## Quick start: build and play
+
+Install DASM and Stella. On Debian or Ubuntu:
 
 ```sh
 sudo apt-get install dasm stella
 ```
 
-## Build
-
-From the repository root:
+Build the ROM:
 
 ```sh
+git clone https://github.com/intelliputer/mi.git
+cd mi
 make
 ```
 
-This assembles `src/adventure.asm` as a headerless 4 KiB ROM at
-`build/adventure.bin`.
-
-To use a DASM executable at a non-default path, set `DASM`:
-
-```sh
-make DASM=/path/to/dasm
-```
-
-## Run
-
-After building, start the ROM in Stella:
+The resulting headerless ROM is `build/adventure.bin`. Launch it with:
 
 ```sh
 make run
 ```
 
-Set `STELLA` when the emulator command has a different name or path:
+In Stella, use the arrow keys to move, Space for fire, F1 for Select, F2 for
+Reset, and Escape to leave game mode.
+
+If DASM or Stella is elsewhere, override the commands:
 
 ```sh
+make DASM=/path/to/dasm
 make run STELLA=/path/to/stella
 ```
 
-Stella's usual keyboard controls are arrow keys for movement, Space for
-fire, F1 for Select, F2 for Reset, and Escape to leave game mode.
-
-## Validate
-
-Run a non-interactive Stella smoke test:
+## Basic validation
 
 ```sh
 make validate
 ```
 
-This builds the ROM, runs it in Stella for 30 emulated frames, and requires
-Stella to save a non-empty PNG snapshot in `build/validation`. The snapshot
-is generated output and can be inspected locally when diagnosing a failure.
+This rebuilds the ROM, runs Stella for 30 emulated frames with dummy audio, and
+requires a non-empty PNG in `build/validation/`. It is a smoke test: it proves
+the ROM was built and rendered, but does not establish gameplay behavior. A
+Stella run still needs access to a graphical SDL session; dummy audio avoids a
+dependency on the host’s active audio output.
 
-## Validate dragon-loss experiment
+## Deterministic agent experiments
 
-For the full build/emulation workflow and the algorithmic-navigation research
-platform, see [Stella validation and navigation notes](docs/STELLA-VALIDATION-AND-NAVIGATION.md).
+The deterministic runner is maintained in the companion fork
+[`intelliputer/stella`](https://github.com/intelliputer/stella). Clone it next
+to this repository—the Makefile defaults to `../stella/stella`:
 
-The local Stella checkout one directory above this repository includes a
-frame-indexed input-script extension used for the first gameplay scenario:
+```sh
+cd ..
+git clone https://github.com/intelliputer/stella.git
+cd stella
+./configure
+make -j"$(nproc)"
+cd ../mi
+```
+
+The local fork requires the SDL 3 development package to build (for example,
+`libsdl3-dev` on Debian/Ubuntu). Its local additions are documented in the
+[Stella fork notes](https://github.com/intelliputer/stella/blob/master/FORK-NOTES.md).
+
+The fork adds these non-interactive options:
+
+- `-inputscript FILE` — replay frame-indexed controller events from JSON;
+- `-snapshotframes N` — save a snapshot and quit at a fixed frame budget;
+- `-assertmemory ADDRESS=VALUE` — return failure unless an emulated RAM byte
+  has the expected hexadecimal value at the final frame;
+- `-telemetry FILE` — emit per-frame JSON Lines state data; and
+- `-keyframeinterval N` — save numbered PNG keyframes at a fixed interval.
+
+## Dragon-loss reference scenario
+
+`validation/dragon-loss.json` is a recorded policy that begins a game, follows
+an exploratory route, and reaches the observed dragon-loss outcome. It is
+useful as a reproducible negative example; it is not a yellow-key solution.
 
 ```sh
 make validate-dragon-loss
 ```
 
-The scenario is an exploratory route that starts the game and ultimately leads
-to a dragon-loss state. It is retained as a reproducible failing policy, not a
-yellow-key pickup test. The first F2 enters the level-selection state and the
-second starts the game. At 1350 emulated frames, it asserts the former
-yellow-key predicate (`$9D=$BF`), which is expected to fail.
+The target intentionally checks the old yellow-key predicate, `RAM[$9D] ==
+$BF`, at frame 1,350. It currently fails because the player is not carrying the
+key. That failure is expected and prevents a bad policy from being reported as
+success.
 
-The custom Stella binary defaults to `../stella/stella`. Override it when
-needed:
+The preserved visual evidence is:
 
-```sh
-make validate-dragon-loss SCENARIO_STELLA=/path/to/stella
-```
+![Dragon-loss trajectory](validation/dragon-loss-trajectory.gif)
 
-## Record an experiment
+See [validation/README.md](validation/README.md) for its provenance.
+
+## Record and inspect a run
 
 ```sh
 make record-dragon-loss
 ```
 
-This writes a replayable bundle at `build/experiments/dragon-loss/`: the action
-trace, per-frame `telemetry.jsonl`, 10-frame keyframe PNGs, a looping
-`trajectory.gif`, and a manifest with the ROM hash and final exit status. This
-known dragon-loss policy is expected to record a failing yellow-key predicate.
+This command intentionally returns non-zero for the known failing policy, but
+still writes a complete replay bundle at `build/experiments/dragon-loss/`:
 
-Set `KEYFRAME_INTERVAL` or `GIF_DELAY` (centiseconds per frame) to tune the
-visual recording:
-
-```sh
-make record-dragon-loss KEYFRAME_INTERVAL=5 GIF_DELAY=4
+```text
+actions.json       exact replayable input trace
+telemetry.jsonl    room, player coordinates, and carried-object state per frame
+keyframes/         PNG frames captured every 10 emulation frames
+trajectory.gif     looping visual trajectory, 15 centiseconds per frame
+manifest.json      ROM SHA-256, run settings, and final exit status
 ```
 
-## Clean
+To run it interactively from a shell while retaining the expected failure:
 
-Remove generated build output:
+```sh
+make record-dragon-loss || true
+xdg-open build/experiments/dragon-loss/trajectory.gif
+```
+
+Tune the visual density or playback speed without changing source:
+
+```sh
+make record-dragon-loss KEYFRAME_INTERVAL=5 GIF_DELAY=10 || true
+```
+
+`KEYFRAME_INTERVAL` defaults to `10`. `GIF_DELAY` is centiseconds per frame
+and defaults to `15` (about 6.7 fps). More keyframes make a larger GIF.
+
+## Extending the experiments
+
+A new agent policy can start by copying `validation/dragon-loss.json`, changing
+the timed Stella input events, and adding a target with a meaningful outcome
+predicate. For this Adventure ROM, useful observed RAM locations are:
+
+| Address | Meaning |
+| --- | --- |
+| `$8A` | Current room |
+| `$8B`, `$8C` | Player X and Y coordinates |
+| `$9D` | Carried object (`$A2` means none; `$BF` is the Game 1 yellow key) |
+
+The gameplay goal remains open: discover a safe policy that reaches and picks
+up the yellow key, then add it as a separate passing scenario. Keep the
+dragon-loss trace as a regression case, so changes to the assembly source or
+navigation logic remain observable.
+
+For implementation history, design rationale, and limitations, read
+[Stella validation and navigation notes](docs/STELLA-VALIDATION-AND-NAVIGATION.md).
+
+## Clean generated output
 
 ```sh
 make clean
 ```
+
+This removes only `build/`; it does not remove the tracked validation evidence.
